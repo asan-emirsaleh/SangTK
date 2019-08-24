@@ -150,9 +150,10 @@ if args.ab1_directory is not None:
      ab1_filename_list, onlyfilenames = listing_ab1_files(args.ab1_directory)
 
      # If one wants the predicted sequence:
-     if args.predict:
+     if args.predict == True:
+         model = pickle.load(open('log_reg_default_million.sav', 'rb'))
          for idx, each_file in enumerate(ab1_filename_list):
-             sequence = ab1_to_predicted_sequence(each_file)
+             sequence = ab1_to_predicted_sequence(each_file, model)
              seq_to_fa('temp.ab1.conv.%s' % onlyfilenames[idx], sequence,
                         onlyfilenames[idx])
 
@@ -163,10 +164,17 @@ if args.ab1_directory is not None:
             seq_to_fa('temp.ab1.conv.%s' % onlyfilenames[idx], sequence,
                         onlyfilenames[idx])
 
-#### Make sure to put in the option for predicted sequence here!!!
+# In case you just want a single file:
 else:
-    sequence = abi_to_seq(args.ab1_file)
-    seq_to_fa('temp.ab1.conv.%s' % args.ab1_file, sequence, args.ab1_file)
+    # If one wants the predicted sequence:
+    if args.predict == True:
+        model = pickle.load(open('log_reg_default_million.sav', 'rb'))
+        sequence = ab1_to_predicted_sequence(args.ab1_file, model)
+        seq_to_fa('temp.ab1.conv.%s' % args.ab1_file, sequence, args.ab1_file)
+    # If one simply wants the given sequence:
+    else:
+        sequence = abi_to_seq(args.ab1_file)
+        seq_to_fa('temp.ab1.conv.%s' % args.ab1_file, sequence, args.ab1_file)
 
 filenames = listing_temp_files('.')
 # Making a separate file for each .fa file:
