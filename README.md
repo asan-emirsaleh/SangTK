@@ -23,8 +23,8 @@ Split output into separate fasta files. Input as true or false.
 **```-o/--fa_name```**   
 Input non-default name for fasta file (not valid if inputting >1 .ab1 file with -s flag).  
    
-**```-pn/predict_nucleotide```**   
+**```-pn/--predict_nucleotide```**   
 Use predictive algorithm to determine sequence. Calls nucleotides given peaks in .ab1 file. 
 
-**```-p/predict_peak_and_nucleotide```**   
+**```-p/--predict_peak_and_nucleotide```**   
 Use predictive algorithm to determine sequence. Calls both peaks and nucleotides. 
