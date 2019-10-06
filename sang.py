@@ -9,6 +9,13 @@ import pickle
 from os import listdir
 from os.path import isfile, join
 import os
+# Loading/running model:
+import tensorflow as tf
+
+import scipy
+from scipy import stats
+
+import numpy as np
 
 # Making the input robust to various 'boolean' inputs:
 def str2bool(v):
@@ -104,10 +111,16 @@ def surrounding_bases(input_df):
     current_previous_following_df = pd.concat([input_df, previous_letter_value_df, following_letter_value_df], axis=1, join='inner')
     return current_previous_following_df
 
-def ab1_to_predicted_sequence(input_ab1_file, model):
+def ab1_to_predicted_sequence(input_ab1_file, model, actual_ab1=True, denormalize=False):
     # Loading in and parsing input df:
-    test_df = abi_to_df(input_ab1_file)
+    if actual_ab1 == True:
+        test_df = abi_to_df(input_ab1_file)
+    else:
+        test_df = input_ab1_file
     test_letter_value_df = test_df[['a_let', 'c_let', 't_let', 'g_let']]
+    # Rerun the nucleotide model on normalized values, but until then:
+    if denormalize == True:
+        test_letter_value_df = test_letter_value_df * 1000
     test_full_info_df = surrounding_bases(test_letter_value_df)
 
     # Using model to predict sequence:
@@ -117,6 +130,58 @@ def ab1_to_predicted_sequence(input_ab1_file, model):
     # Acquiring and returning sequence:
     sequence = ''.join(list(predicted_probs_df['Prediction']))
     return sequence
+
+# This combines a peak df with a full record
+def peak_calling_df(input_df, input_seqio_record):
+    input_df['peak_no_peak'] = [1] * input_df.shape[0]
+    input_df.index = input_df.index + 1####MAYBE KEEP THIS IN? MAYBE REMOVE IT?
+    first_val = input_df.index[0] - 5
+    last_val = input_df.index[-1] + 5
+    removed_df = input_df[['peak_no_peak']]
+    # Different df with all the waveform data:
+    peak_val = pd.DataFrame()
+    peak_val['g_let'] = list(input_seqio_record.annotations['abif_raw']['DATA9'])
+    peak_val['a_let'] = list(input_seqio_record.annotations['abif_raw']['DATA10'])
+    peak_val['t_let'] = list(input_seqio_record.annotations['abif_raw']['DATA11'])
+    peak_val['c_let'] = list(input_seqio_record.annotations['abif_raw']['DATA12'])
+
+    peak_val = peak_val.loc[first_val:last_val]
+    fin_df = removed_df.merge(peak_val, how='outer', left_index=True, right_index=True)
+    zero = fin_df[fin_df['peak_no_peak'] !=1]
+    zero['peak_no_peak'] = [0] * zero.shape[0]
+    nonzero = fin_df[fin_df['peak_no_peak'] ==1]
+    fin_df = zero.append(nonzero)
+    fin_df.sort_index(inplace=True)
+    return fin_df
+
+def slope(inp_df):
+    only_letters = inp_df[['g_let', 'a_let', 't_let', 'c_let']]
+    slope_before = only_letters.diff(1, axis=0)
+    slope_before.columns = ['slope_g_after', 'slope_a_after', 'slope_t_after', 'slope_c_after']
+    slope_after = only_letters.diff(-1, axis=0)
+    slope_after.columns = ['slope_g_before', 'slope_a_before', 'slope_t_before', 'slope_c_before']
+
+    final = only_letters.join(slope_before)
+    final = final.join(slope_after)
+    final = final.join(inp_df[['peak_no_peak']])
+    return final
+
+def normalizing(inp_df):
+    all_peak_places = inp_df[inp_df['peak_no_peak'] == 1]
+    all_peak_places_vals = all_peak_places[['g_let', 'a_let', 't_let', 'c_let']]
+    all_max_peaks = list(all_peak_places_vals.max(axis=1))
+    trimmed_mean = scipy.stats.trim_mean(all_max_peaks, proportiontocut=0.1)
+    inp_df = inp_df / trimmed_mean
+    inp_df['peak_no_peak'] = inp_df['peak_no_peak'] * trimmed_mean
+    inp_df['peak_no_peak'] = inp_df['peak_no_peak'].astype(int)
+    return inp_df
+
+def reshaping_the_df(inp_df, first_dim, second_dim, third_dim):
+    y_val_train = np.array(inp_df['peak_no_peak'])
+    inp_df = inp_df.iloc[:,:-1]
+    x_val_train = inp_df.values.reshape((first_dim,second_dim,third_dim))
+    return x_val_train, y_val_train
+
 
 parser = argparse.ArgumentParser(description='Sanger analysis')
 # Files or directories:
@@ -132,10 +197,15 @@ parser.add_argument('-s', '--split', type=str2bool, nargs='?',
 # Name of output file
 parser.add_argument('-o', '--fa_name', metavar = '',
                     help='Name of output .fa file')
-# Check whether prediction is desired.
-parser.add_argument('-p', '--predict', type=str2bool, nargs='?',
+# Check whether nucleotide prediction is desired.
+parser.add_argument('-pn', '--predict_nucleotide', type=str2bool, nargs='?',
                         const=True, default=False, metavar = '',
-                        help="Converting input sequence to predicted sequences")
+                        help="Converting input sequence to predicted sequences calling nucleotides")
+
+# Check whether peak AND nucleotide prediction is desired.
+parser.add_argument('-p', '--predict_peak_and_nucleotide', type=str2bool, nargs='?',
+                        const=True, default=False, metavar = '',
+                        help="Converting input sequence to predicted sequences calling peaks and nucleotides")
 
 
 args = parser.parse_args()
@@ -149,13 +219,51 @@ if args.ab1_directory is not None:
      # Get the file names:
      ab1_filename_list, onlyfilenames = listing_ab1_files(args.ab1_directory)
 
-     # If one wants the predicted sequence:
-     if args.predict == True:
+     # If one wants the nucleotide predicted sequence:
+     if args.predict_nucleotide == True:
          model = pickle.load(open('log_reg_default_million.sav', 'rb'))
          for idx, each_file in enumerate(ab1_filename_list):
              sequence = ab1_to_predicted_sequence(each_file, model)
              seq_to_fa('temp.ab1.conv.%s' % onlyfilenames[idx], sequence,
                         onlyfilenames[idx])
+
+    # If one wants the peak and the nucleotide predicted sequence:
+     elif args.predict_peak_and_nucleotide == True:
+        peak_model = tf.keras.models.load_model('model.h5')
+        nucleotide_model = pickle.load(open('log_reg_default_million.sav', 'rb'))
+        # Reading in the peak_df file(s):
+        for idx, each_file in enumerate(ab1_filename_list):
+            # print(each_file + '\n\n\n')
+            # Reading in the file:
+            current_record = SeqIO.read(each_file, 'abi')
+            # Prepping it for the prediction
+            current_training_df = abi_to_df(each_file)
+            current_training_df['saving_og'] = current_training_df['Letters']
+            fin_training = peak_calling_df(current_training_df, current_record)
+            fin_training = normalizing(fin_training)
+            fin_training = slope(fin_training)
+            x_pred_peaks, y_pred_peaks = reshaping_the_df(fin_training,
+                                                          fin_training.shape[0],
+                                                          1, 12)
+            # Predicting
+            final_predicted_y = peak_model.predict(x_pred_peaks)
+            # Getting the predicted values:
+            predicted_val = []
+            for each_pred in final_predicted_y:
+                if each_pred[1] > 0.5:
+                    predicted_val.append(1)
+                else:
+                    predicted_val.append(0)
+            # Appending them to the dataframe:
+            fin_training['predicted_peaks'] = predicted_val
+            just_peaks = fin_training[fin_training['predicted_peaks']==1]
+
+            sequence = ab1_to_predicted_sequence(just_peaks, nucleotide_model,
+                                                 actual_ab1=False, denormalize=True)
+            # Converting the predicted peaks to sequences:
+            seq_to_fa('temp.ab1.conv.%s' % onlyfilenames[idx], sequence,
+                        onlyfilenames[idx])
+
 
     # If one wants the assigned sequence:
      else:
@@ -167,10 +275,44 @@ if args.ab1_directory is not None:
 # In case you just want a single file:
 else:
     # If one wants the predicted sequence:
-    if args.predict == True:
+    if args.predict_nucleotide == True:
         model = pickle.load(open('log_reg_default_million.sav', 'rb'))
         sequence = ab1_to_predicted_sequence(args.ab1_file, model)
         seq_to_fa('temp.ab1.conv.%s' % args.ab1_file, sequence, args.ab1_file)
+
+    # If one wants the predicted peaks and nucleotides:
+    elif args.predict_peak_and_nucleotide == True:
+        peak_model = tf.keras.models.load_model('model.h5')
+        nucleotide_model = pickle.load(open('log_reg_default_million.sav', 'rb'))
+        current_record = SeqIO.read(args.ab1_file, 'abi')
+        # print(current_record)
+        current_training_df = abi_to_df(args.ab1_file)
+        current_training_df['saving_og'] = current_training_df['Letters']
+        fin_training = peak_calling_df(current_training_df, current_record)
+        fin_training = normalizing(fin_training)
+        fin_training = slope(fin_training)
+        x_pred_peaks, y_pred_peaks = reshaping_the_df(fin_training,
+                                                      fin_training.shape[0],
+                                                      1, 12)
+        # Predicting
+        final_predicted_y = peak_model.predict(x_pred_peaks)
+        # Getting the predicted values:
+        predicted_val = []
+        for idx, item in enumerate(final_predicted_y):
+            if item[1] > 0.5:
+                predicted_val.append(1)
+            else:
+                predicted_val.append(0)
+        # Appending them to the dataframe:
+        fin_training['predicted_peaks'] = predicted_val
+        just_peaks = fin_training[fin_training['predicted_peaks']==1]
+
+        sequence = ab1_to_predicted_sequence(just_peaks, nucleotide_model,
+                                             actual_ab1=False, denormalize=True)
+        # Converting the predicted peaks to sequences:
+        seq_to_fa('temp.ab1.conv.%s' % args.ab1_file, sequence, args.ab1_file)
+
+
     # If one simply wants the given sequence:
     else:
         sequence = abi_to_seq(args.ab1_file)
