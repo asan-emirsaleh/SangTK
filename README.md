@@ -4,6 +4,9 @@
 * biopython
 * pandas
 * sklearn
+* tensorflow/keras
+* scipy
+* numpy
 
 ## Usage
 ```
