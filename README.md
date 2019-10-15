@@ -1,5 +1,13 @@
 # SangTK
 
+## Function
+SangTK is a toolkit for AB1 (sanger sequencing) files that can perform any combination of the following functions:
+* Convert .abi files to .fa files
+* Convert a directory of .abi files into a single fa file or separate .fa files
+* Perform logistic regression on nucleotide peaks to improve sequence quality
+* Call peaks using a Bi-Directional LSTM RNN
+* Improve the quality of the supplied peak calls
+
 ## Dependencies
 * biopython
 * pandas
@@ -12,14 +20,14 @@
 ```
 python sang.py [-h]
 ```
-#### Essential options
+#### Essential inputs
 **```-d/--ab1_directory```**   
 Directory containing .ab1 files to be converted into fasta file.   
    
 **```-f/--ab1_file```**   
 Single .ab1 file to be converted into fasta file.   
    
-#### Optional options
+#### Optional inputs
 **```-s/--split```**   
 Split output into separate fasta files. Input as true or false. 
    
