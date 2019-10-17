@@ -9,6 +9,7 @@ SangTK is a toolkit for AB1 (sanger sequencing) files that can perform any combi
 * Improve the quality of the supplied peak calls
 
 ## Dependencies
+* python 3
 * biopython
 * pandas
 * sklearn
