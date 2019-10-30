@@ -12,6 +12,8 @@ import os
 # Loading/running model:
 import tensorflow as tf
 
+import sys
+
 import scipy
 from scipy import stats
 
@@ -182,14 +184,37 @@ def reshaping_the_df(inp_df, first_dim, second_dim, third_dim):
     x_val_train = inp_df.values.reshape((first_dim,second_dim,third_dim))
     return x_val_train, y_val_train
 
+# Tests to make sure the code is still working
+def test_check(test_kind, input_file):
+    if test_kind == 'nucleotide':
+        validation_sequence = open('./test_folder/nucleotide_validation.txt')
+        for line in validation_sequence:
+            line = line.strip()
+        sequence_to_be_validated = open('./test_folder/%s' % input_file)
+        for second_line in sequence_to_be_validated:
+            second_line = second_line.strip()
+        if line == second_line:
+            return('Test passed')
+    elif test_kind == 'peak':
+        validation_sequence = open('./test_folder/nucleotide_and_peak_validation.txt')
+        for line in validation_sequence:
+            line = line.strip()
+        sequence_to_be_validated = open('./test_folder/%s' % input_file)
+        for second_line in sequence_to_be_validated:
+            second_line = second_line.strip()
+        if line == second_line:
+            return('Test passed')
 
 parser = argparse.ArgumentParser(description='Sanger analysis')
-# Files or directories:
+# Files or directories, these are mutually exclusive options:
 group = parser.add_mutually_exclusive_group(required=True)
 group.add_argument('-d', '--ab1_directory', metavar = '',
                     help='Directory containing ab1 files')
 group.add_argument('-f', '--ab1_file', metavar = '',
                     help='ab1 file')
+group.add_argument('-t', '--testing', metavar = '',
+                   help='Unit and integration tests')
+
 # If several inputs are given, have the option to make several different fastas:
 parser.add_argument('-s', '--split', type=str2bool, nargs='?',
                         const=True, default=False, metavar = '',
@@ -197,6 +222,7 @@ parser.add_argument('-s', '--split', type=str2bool, nargs='?',
 # Name of output file
 parser.add_argument('-o', '--fa_name', metavar = '',
                     help='Name of output .fa file')
+
 # Check whether nucleotide prediction is desired.
 parser.add_argument('-pn', '--predict_nucleotide', type=str2bool, nargs='?',
                         const=True, default=False, metavar = '',
@@ -207,8 +233,18 @@ parser.add_argument('-p', '--predict_peak_and_nucleotide', type=str2bool, nargs=
                         const=True, default=False, metavar = '',
                         help="Converting input sequence to predicted sequences calling peaks and nucleotides")
 
-
 args = parser.parse_args()
+
+if args.testing == 'nucleotide':
+    output_file = 'test_nucleotide_output'
+    os.system('python sang.py -f ab1_test_file.ab1 -o %s.fa -pn' % output_file)
+    test_check('peak', output_file)
+    sys.exit()
+elif args.testing == 'peak':
+    output_file = 'test_nucleotide_and_peak_output'
+    os.system('python sang.py -f ab1_test_file.ab1 -o %s.fa -p' % output_file)
+    test_check('peak', output_file)
+    sys.exit()
 
 # Ensure either the file or the directory was selected:
 if args.ab1_directory is not None and args.ab1_file is not None:
@@ -285,7 +321,6 @@ else:
         peak_model = tf.keras.models.load_model('model.h5')
         nucleotide_model = pickle.load(open('log_reg_default_million.sav', 'rb'))
         current_record = SeqIO.read(args.ab1_file, 'abi')
-        # print(current_record)
         current_training_df = abi_to_df(args.ab1_file)
         current_training_df['saving_og'] = current_training_df['Letters']
         fin_training = peak_calling_df(current_training_df, current_record)
