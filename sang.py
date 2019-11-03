@@ -12,7 +12,9 @@ import os
 # Loading/running model:
 import tensorflow as tf
 
+# Running tests
 import sys
+import filecmp
 
 import scipy
 from scipy import stats
@@ -184,26 +186,26 @@ def reshaping_the_df(inp_df, first_dim, second_dim, third_dim):
     x_val_train = inp_df.values.reshape((first_dim,second_dim,third_dim))
     return x_val_train, y_val_train
 
-# Tests to make sure the code is still working
+# Ensures the output sequences match previously defined output sequences
 def test_check(test_kind, input_file):
+    # The outputs of the nucleotide and peak sequences will be different
     if test_kind == 'nucleotide':
-        validation_sequence = open('./test_folder/nucleotide_validation.txt')
-        for line in validation_sequence:
-            line = line.strip()
-        sequence_to_be_validated = open('./test_folder/%s' % input_file)
-        for second_line in sequence_to_be_validated:
-            second_line = second_line.strip()
-        if line == second_line:
-            return('Test passed')
+        validation_file = ('./test_folder/nucleotide_validation.txt')
+        to_be_validated = ('./%s.fa' % input_file)
+        comparison = filecmp.cmp(validation_file,to_be_validated)
+        if comparison == True:
+            print('Test Passed')
+        else:
+            print('Test Failed')
+
     elif test_kind == 'peak':
-        validation_sequence = open('./test_folder/nucleotide_and_peak_validation.txt')
-        for line in validation_sequence:
-            line = line.strip()
-        sequence_to_be_validated = open('./test_folder/%s' % input_file)
-        for second_line in sequence_to_be_validated:
-            second_line = second_line.strip()
-        if line == second_line:
-            return('Test passed')
+        validation_file = ('./test_folder/nucleotide_and_peak_validation.txt')
+        to_be_validated = ('./%s.fa' % input_file)
+        comparison = filecmp.cmp(validation_file,to_be_validated)
+        if comparison == True:
+            print('Test Passed')
+        else:
+            print('Test Failed')
 
 parser = argparse.ArgumentParser(description='Sanger analysis')
 # Files or directories, these are mutually exclusive options:
@@ -237,13 +239,21 @@ args = parser.parse_args()
 
 if args.testing == 'nucleotide':
     output_file = 'test_nucleotide_output'
+    # Running the test for the nucleotide prediction
     os.system('python sang.py -f ab1_test_file.ab1 -o %s.fa -pn' % output_file)
-    test_check('peak', output_file)
+    # Checking if the results match previous results
+    test_check('nucleotide', output_file)
+    # Cleaning up
+    os.system('rm %s.fa' % output_file)
     sys.exit()
 elif args.testing == 'peak':
     output_file = 'test_nucleotide_and_peak_output'
+    # Running the test for the peak and nucleotide prediction
     os.system('python sang.py -f ab1_test_file.ab1 -o %s.fa -p' % output_file)
+    # Checking if the results match previous results
     test_check('peak', output_file)
+    # Cleaning up
+    os.system('rm %s.fa' % output_file)
     sys.exit()
 
 # Ensure either the file or the directory was selected:
