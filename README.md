@@ -27,7 +27,10 @@ Directory containing .ab1 files to be converted into fasta file.
    
 **```-f/--ab1_file```**   
 Single .ab1 file to be converted into fasta file.   
-   
+  
+**```-t/--testing```**   
+Testing functionality. Use either 'nucleotide' to test nucleotide calling or 'peak' to test both nucleotide and peak testing. 
+
 #### Optional inputs
 **```-s/--split```**   
 Split output into separate fasta files. Input as true or false. 
