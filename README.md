@@ -18,9 +18,8 @@ SangTK is a toolkit for AB1 (sanger sequencing) files that can perform any combi
 * numpy
 
 ## Usage
-```
-python sang.py [-h]
-```
+```python sang.py [-h]```
+
 #### Essential (exclusive) inputs
 **```-d/--ab1_directory```**   
 Directory containing .ab1 files to be converted into fasta file.   
