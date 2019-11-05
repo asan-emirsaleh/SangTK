@@ -16,6 +16,7 @@ SangTK is a toolkit for AB1 (sanger sequencing) files that can perform any combi
 * tensorflow/keras
 * scipy
 * numpy
+* ncbi blastn (only for testing)
 
 ## Usage
 ```python sang.py [-h]```
