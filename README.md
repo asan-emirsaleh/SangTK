@@ -1,4 +1,5 @@
 # SangTK
+SangTK is an ML-backed toolkit that improves the quality of Sanger base calls.
 
 ## Function
 SangTK is a toolkit for AB1 (sanger sequencing) files that can perform any combination of the following functions:
